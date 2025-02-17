@@ -22,8 +22,10 @@ fn main() {
         let keys: Vec<Keycode> = device_state.get_keys();
         for key in &keys {
             let key_code = get_keymap_code(key.to_string());
+            println!("Key pressed: {:?}, key_code: {}", key, key_code);
             for (key_name, audio_file) in audio_data.iter() {
                 if key_code != "" && key_code == *key_name {
+                    println!("Playing audio file: {}", audio_file);
                     play_audio(audio_file.to_string());
                 }
             }
@@ -66,6 +68,8 @@ fn play_audio(filepath: String) {
         Ok(file) => {
             let source = rodio::Decoder::new(BufReader::new(file)).unwrap();
             sink.append(source);
+            sink.sleep_until_end(); //不加这句不会播放
+            // sink.play();
         }
         Err(_) => {} // 如果文件不存在或打开失败，不执行任何操作
     }

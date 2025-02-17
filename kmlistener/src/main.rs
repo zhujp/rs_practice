@@ -1,15 +1,23 @@
 use device_query::{DeviceQuery, DeviceState, Keycode};
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::{thread, time::Duration};
+use std::io::{self, BufRead, BufReader};
+use std::{env, thread, time::Duration};
 
 fn main() {
     let device_state = DeviceState::new();
 
     println!("Press any key (Esc to exit)...");
+    let args: Vec<String> = env::args().collect();
 
-    let audio_data = load_audiojson("./data/audio.json".to_string());
+    if args.len() < 2 {
+        eprintln!("Please provide the path to the audio file as an argument");
+        return;
+    }
+
+    let audio_path = &args[1];
+    println!("audio_path:{}", audio_path);
+    let audio_data = load_audiojson(audio_path.to_string());
 
     loop {
         let keys: Vec<Keycode> = device_state.get_keys();

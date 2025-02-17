@@ -1,7 +1,7 @@
 use device_query::{DeviceQuery, DeviceState, Keycode};
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{self, BufRead, BufReader};
+use std::io::BufReader;
 use std::{env, thread, time::Duration};
 
 fn main() {
@@ -16,18 +16,14 @@ fn main() {
     }
 
     let audio_path = &args[1];
-    println!("audio_path:{}", audio_path);
     let audio_data = load_audiojson(audio_path.to_string());
 
     loop {
         let keys: Vec<Keycode> = device_state.get_keys();
         for key in &keys {
-            println!("Key pressed: {:?}", key);
             let key_code = get_keymap_code(key.to_string());
             for (key_name, audio_file) in audio_data.iter() {
                 if key_code != "" && key_code == *key_name {
-                    println!("Playing audio file: {}", audio_file);
-                    // Play audio file here
                     play_audio(audio_file.to_string());
                 }
             }
@@ -63,8 +59,16 @@ fn load_audiojson(filepath: String) -> HashMap<String, String> {
 fn play_audio(filepath: String) {
     let (_stream_handle, stream) = rodio::OutputStream::try_default().unwrap();
     let sink = rodio::Sink::try_new(&stream).unwrap();
-    let file = File::open(filepath).expect("Failed to open file");
-    let source = rodio::Decoder::new(BufReader::new(file)).unwrap();
-    sink.append(source);
+    // let file = File::open(filepath).expect("Failed to open file");  //当文件不存在会报错
+    // let source = rodio::Decoder::new(BufReader::new(file)).unwrap();
+    // sink.append(source);
+    match File::open(filepath) {
+        Ok(file) => {
+            let source = rodio::Decoder::new(BufReader::new(file)).unwrap();
+            sink.append(source);
+        }
+        Err(_) => {} // 如果文件不存在或打开失败，不执行任何操作
+    }
+
     // sink.sleep_until_end(); // 等待音频播放完毕
 }

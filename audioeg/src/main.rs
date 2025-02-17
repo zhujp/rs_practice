@@ -1,6 +1,6 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use hound::{WavSpec, WavWriter,WavReader};
-use rustfft::{FftPlanner, num_complex::Complex};
+use hound::{WavReader, WavSpec, WavWriter};
+use rustfft::{num_complex::Complex, FftPlanner};
 // use std::f32::consts::PI;
 use std::fs::File;
 use std::io::Write;
@@ -9,13 +9,13 @@ use std::time::Duration;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 初始化 CPAL 主机
-    let delay_time:u64 = 10;
-    let _ = record_audio("output.wav".to_string(),delay_time);
+    let delay_time: u64 = 10;
+    let _ = record_audio("output.wav".to_string(), delay_time);
     let _ = anylize_wav("output.wav".to_string());
     Ok(())
 }
 
-fn anylize_wav(audio_path:String) -> Result<(), Box<dyn std::error::Error>> {
+fn anylize_wav(audio_path: String) -> Result<(), Box<dyn std::error::Error>> {
     let mut reader = WavReader::open(audio_path)?;
     let samples: Vec<f32> = reader
         .samples::<i16>()
@@ -51,14 +51,16 @@ fn anylize_wav(audio_path:String) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn record_audio(audio_path:String,delay_time:u64) -> Result<(), Box<dyn std::error::Error>> {
+fn record_audio(audio_path: String, delay_time: u64) -> Result<(), Box<dyn std::error::Error>> {
     let host = cpal::default_host();
 
     // 获取默认输入设备（通常是系统音频输出）
-    let device = host
-        .default_input_device()
-        .expect("Failed to get default input device");
+    let input_device = host.default_input_device();
 
+    let device = match input_device {
+        Some(device) => device,
+        None => panic!("No default input device found"),
+    };
     // 获取默认输入格式
     let supported_format = device
         .default_input_config()
@@ -107,7 +109,7 @@ fn record_audio(audio_path:String,delay_time:u64) -> Result<(), Box<dyn std::err
     drop(stream);
 
     // 显式释放 WavWriter 的所有权并调用 finalize
-    let  writer = Arc::try_unwrap(writer)
+    let writer = Arc::try_unwrap(writer)
         .map_err(|_| "Failed to unwrap Arc")?
         .into_inner()
         .map_err(|_| "Failed to unlock Mutex")?;

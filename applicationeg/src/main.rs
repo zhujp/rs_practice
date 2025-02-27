@@ -1,96 +1,102 @@
-extern crate winreg;
-
+use std::ffi::OsStr;
 use std::io;
+use std::iter::once;
+use std::os::windows::ffi::OsStrExt;
+use std::path::PathBuf;
+use winapi::shared::windef::HICON;
+use winapi::um::libloaderapi::GetModuleHandleW;
+use winapi::um::winuser::{DestroyIcon, LoadImageW};
 use winreg::enums::*;
 use winreg::RegKey;
-use std::fs;
-use std::path::Path;
 
-fn main() -> io::Result<()> {
-    // 打开注册表中的 Uninstall 路径
+// 定义一个结构体来保存图标句柄和路径等信息
+pub struct IconInfo {
+    pub icon_handle: HICON,
+    pub icon_path: String,
+}
+
+#[derive(Debug)]
+struct InstalledSoftware {
+    name: String,
+    icon: Option<String>,
+    install_location: Option<String>,
+}
+
+fn list_installed_software() -> io::Result<Vec<InstalledSoftware>> {
     let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-
-    // 定义需要检查的注册表路径
-    let uninstall_paths = vec![
+    let uninstall_key = hklm.open_subkey_with_flags(
         "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
-        "SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
-    ];
+        KEY_READ,
+    )?;
 
-    // 遍历注册表路径
-    for uninstall_path in uninstall_paths {
-        if let Ok(key) = hklm.open_subkey(uninstall_path) {
-            // list_install_locations(&key)?;
-            list_all_subkey_fields(&key)?;
-        }
+    let mut software_list = Vec::new();
 
-        if let Ok(key) = hkcu.open_subkey(uninstall_path) {
-            // list_install_locations(&key)?;
-            list_all_subkey_fields(&key)?;
-        }
-    }
+    for entry in uninstall_key.enum_keys()? {
+        let entry_key = uninstall_key.open_subkey_with_flags(&entry, KEY_READ)?;
 
-    Ok(())
-}
+        let display_name: Option<String> = entry_key.get_value("DisplayName")?;
+        let display_icon: Option<String> = entry_key.get_value("DisplayIcon")?;
+        let install_location: Option<String> = entry_key.get_value("InstallLocation")?;
 
-#[cfg(target_os = "windows")]
-fn list_install_locations(key: &RegKey) -> io::Result<()> {
-    // 遍历注册表中的子键
-    for subkey_name in key.enum_keys().filter_map(|x| x.ok()) {
-        if let Ok(subkey) = key.open_subkey(&subkey_name) {
-            // 读取 DisplayName 和 InstallLocation
-            if let Ok(display_name) = subkey.get_value::<String, _>("DisplayName") {
-                if let Ok(install_location) = subkey.get_value::<String, _>("InstallLocation") {
-                    if !install_location.is_empty() {
-                        println!("软件名称: {}", display_name);
-                        println!("安装路径: {}", install_location);
-                        println!("-----------------------------");
-                    }
-                }
-            }
+        if let Some(name) = display_name {
+            software_list.push(InstalledSoftware {
+                name,
+                icon: display_icon,
+                install_location,
+            });
         }
     }
 
-    Ok(())
+    Ok(software_list)
 }
 
-#[cfg(target_os = "windows")]
-fn list_all_subkey_fields(key: &RegKey) -> io::Result<()> {
-    // 遍历注册表中的子键
-    for subkey_name in key.enum_keys().filter_map(|x| x.ok()) {
-        if let Ok(subkey) = key.open_subkey(&subkey_name) {
-            println!("软件子键: {}", subkey_name);
-            println!("-----------------------------");
+// 提取图标函数
+fn extract_icon_from_path(icon_path: &str, resource_index: u32) -> Option<IconInfo> {
+    unsafe {
+        // 将字符串转换为宽字符
+        let path = OsStr::new(icon_path)
+            .encode_wide()
+            .chain(once(0))
+            .collect::<Vec<u16>>();
+        let module_handle = GetModuleHandleW(path.as_ptr());
 
-            // 遍历子键中的所有字段
-            for value_name in subkey.enum_values().filter_map(|x| x.ok()) {
-                let value_data = match subkey.get_raw_value(&value_name) {
-                    Ok(data) => format!("{:?}", data),
-                    Err(_) => "无法读取".to_string(),
-                };
-                println!("{}: {}", value_name, value_data);
-            }
-
-            println!("-----------------------------");
+        if module_handle.is_null() {
+            return None;
         }
+
+        // 使用LoadImageW加载图标
+        let icon_handle = LoadImageW(
+            module_handle,
+            resource_index as *const _,
+            winapi::um::winuser::IMAGE_ICON,
+            0, // 使用系统默认大小
+            0, // 使用系统默认大小
+            winapi::um::winuser::LR_DEFAULTSIZE | winapi::um::winuser::LR_LOADFROMFILE,
+        ) as HICON;
+
+        if icon_handle.is_null() {
+            return None;
+        }
+
+        Some(IconInfo {
+            icon_handle,
+            icon_path: icon_path.to_string(),
+        })
     }
-
-    Ok(())
 }
 
-#[cfg(target_os = "macos")]
-fn list_installed_software_mac() {
-    let applications_dir = Path::new("/Applications");
-    if applications_dir.is_dir() {
-        if let Ok(entries) = fs::read_dir(applications_dir) {
-            for entry in entries {
-                if let Ok(entry) = entry {
-                    let path = entry.path();
-                    if path.is_dir() && path.extension().map_or(false, |ext| ext == "app") {
-                        println!("Application: {}", path.display());
-                    }
-                }
-            }
+fn main() {
+    let icon_path = r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe";
+    let resource_index = 0; // 假设资源索引为0
+
+    if let Some(icon_info) = extract_icon_from_path(icon_path, resource_index) {
+        println!("Icon extracted from: {}", icon_info.icon_path);
+
+        // 在使用完图标后需要销毁图标
+        unsafe {
+            DestroyIcon(icon_info.icon_handle);
         }
+    } else {
+        println!("Failed to extract icon");
     }
 }

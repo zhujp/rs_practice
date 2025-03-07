@@ -25,22 +25,22 @@ fn main() {
 
     // ctx.set_files(dest_files).unwrap(); //success
 
-    let has_img = ctx.has(ContentFormat::Image);
-    println!("has_img={}", has_img);
-    let img = ctx.get_image();
-    match img {
-        Ok(img) => {
-            let _ = img
-                .save_to_path(format!("{}clipboard.png", TMP_PATH).as_str())
-                .map_err(|e| println!("err={:?}", e));
-        }
-        Err(err) => {
-            println!("err={:?}", err);
-        }
-    }
+    // let has_img = ctx.has(ContentFormat::Image);
+    // println!("has_img={}", has_img);
+    // let img = ctx.get_image();
+    // match img {
+    //     Ok(img) => {
+    //         let _ = img
+    //             .save_to_path(format!("{}clipboard.png", TMP_PATH).as_str())
+    //             .map_err(|e| println!("err={:?}", e));
+    //     }
+    //     Err(err) => {
+    //         println!("err={:?}", err);
+    //     }
+    // }
 }
 
-//文件：复制文件/文件夹
+//文件：复制文件/文件夹  压缩文件files只有一个元素，如果是文件夹，就是目录元素，如果是多个文件则是多个元素
 //图片：截图
 //文本:复制文本/url链接
 //html：富文本

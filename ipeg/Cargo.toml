@@ -1,0 +1,8 @@
+[package]
+name = "ipeg"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+if-addrs = "0.13.3"
+hostname = "0.4.0"

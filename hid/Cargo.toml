@@ -1,0 +1,8 @@
+[package]
+name = "hid"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hidapi = "2.6.3"
+hidparser = "1.0.3"
